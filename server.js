@@ -40,6 +40,15 @@ function clerkAuth(req, res, next) {
 }
 // ---------------------
 
+// Expose the Clerk publishable key to the frontend
+app.get('/api/config', (req, res) => {
+    const clerkPubKey = process.env.CLERK_PUBLISHABLE_KEY;
+    if (!clerkPubKey) {
+        return res.status(503).json({ error: 'CLERK_PUBLISHABLE_KEY is not configured on the server.' });
+    }
+    res.json({ clerkPubKey });
+});
+
 // Serve all other public files normally
 app.use(express.static('public'));
 
