@@ -31,7 +31,10 @@ app.get('/admin.html', adminLock, (req, res) => {
 // Clerk auth middleware — returns 401 JSON if the request is unauthenticated
 function clerkAuth(req, res, next) {
     ClerkExpressRequireAuth()(req, res, (err) => {
-        if (err) return res.status(401).json({ error: 'Unauthorized' });
+        if (err) {
+            console.error('Clerk auth error:', err.message || err);
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
         next();
     });
 }

@@ -332,7 +332,19 @@ function sanitizeUrl(url) {
 // ---- Clerk Authentication ----
 
 async function initClerk() {
-    if (!window.Clerk) return;
+    if (!window.Clerk) {
+        // Clerk script not loaded — show a message so the user knows to configure their key
+        const inputArea = document.querySelector('.input-area');
+        if (inputArea) inputArea.classList.add('display-none');
+        const welcome = document.getElementById('welcomeScreen');
+        if (welcome) {
+            welcome.innerHTML = `
+                <div class="welcome-icon">⚠️</div>
+                <h2>Authentication Unavailable</h2>
+                <p>The authentication service could not be loaded. Please ensure the Clerk publishable key is configured.</p>`;
+        }
+        return;
+    }
     await window.Clerk.load();
 
     if (window.Clerk.user) {
@@ -341,15 +353,21 @@ async function initClerk() {
     } else {
         // User is not signed in — hide the chat input and show a sign-in prompt
         const inputArea = document.querySelector('.input-area');
-        if (inputArea) inputArea.style.display = 'none';
+        if (inputArea) inputArea.classList.add('display-none');
 
         const welcome = document.getElementById('welcomeScreen');
         if (welcome) {
+            const signInBtn = document.createElement('button');
+            signInBtn.className = 'btn';
+            signInBtn.style.marginTop = '1rem';
+            signInBtn.textContent = 'Sign In';
+            signInBtn.addEventListener('click', () => window.Clerk.redirectToSignIn());
+
             welcome.innerHTML = `
                 <div class="welcome-icon">🔒</div>
                 <h2>Welcome to EchoSphere</h2>
-                <p>Please sign in to access your personal workspace and history.</p>
-                <button class="btn" style="margin-top:1rem" onclick="window.Clerk.redirectToSignIn()">Sign In</button>`;
+                <p>Please sign in to access your personal workspace and history.</p>`;
+            welcome.appendChild(signInBtn);
         }
     }
 }
