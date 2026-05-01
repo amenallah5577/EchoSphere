@@ -375,8 +375,25 @@ async function initClerk() {
 // ---- Init ----
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Clerk authentication
-    initClerk();
+    // Fetch the Clerk publishable key from the backend, then dynamically load the Clerk script
+    fetch('/api/config')
+        .then(res => res.json())
+        .then(config => {
+            if (config.clerkPubKey) {
+                const script = document.createElement('script');
+                script.setAttribute('data-clerk-publishable-key', config.clerkPubKey);
+                script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
+                script.crossOrigin = 'anonymous';
+                script.onload = () => initClerk();
+                document.head.appendChild(script);
+            } else {
+                initClerk();
+            }
+        })
+        .catch(err => {
+            console.error('Failed to fetch /api/config:', err);
+            initClerk();
+        });
 
     // Inject status bar into feed if not present
     const feed = document.getElementById('feed');
