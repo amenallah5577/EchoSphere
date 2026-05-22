@@ -6,9 +6,10 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
-const { ClerkExpressRequireAuth } = require('@clerk/clerk-sdk-node');
+const { clerkMiddleware, getAuth } = require('@clerk/express');
 
 const app = express();
+app.use(clerkMiddleware());
 app.use(cors());
 app.use(express.json());
 
@@ -28,15 +29,14 @@ app.get('/admin.html', adminLock, (req, res) => {
     res.sendFile(__dirname + '/public/admin.html');
 });
 
-// Clerk auth middleware — returns 401 JSON if the request is unauthenticated
+// Clerk auth middleware - returns 401 JSON if the request is unauthenticated
 function clerkAuth(req, res, next) {
-    ClerkExpressRequireAuth()(req, res, (err) => {
-        if (err) {
-            console.error('Clerk auth error:', err.message || err);
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-        next();
-    });
+    const auth = getAuth(req);
+    if (!auth.userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    req.auth = auth;
+    next();
 }
 // ---------------------
 
@@ -220,7 +220,7 @@ Respond ONLY in valid JSON using this exact schema:
 
         // Remove the internal scratchpad field — it is for Chain of Thought only and must not be sent to the client
         delete agentResponse.scratchpad;
-        
+
         // Save to Database
         try {
             const newHistory = new History({
@@ -248,6 +248,15 @@ app.get('/api/history', clerkAuth, async (req, res) => {
         res.json(history);
     } catch (err) {
         res.status(500).json({ error: "Could not fetch history" });
+    }
+});
+
+app.get('/api/admin/history', adminLock, async (req, res) => {
+    try {
+        const history = await History.find({}).sort({ date: -1 }).limit(100);
+        res.json(history);
+    } catch (err) {
+        res.status(500).json({ error: "Could not fetch admin history" });
     }
 });
 

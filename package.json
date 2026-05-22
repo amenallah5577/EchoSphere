@@ -1,13 +1,25 @@
 {
   "name": "ecosphere",
   "version": "1.0.0",
-  "description": "AI Web Agent",
+  "description": "EchoSphere is an authenticated AI research workspace for web intelligence, PDF analysis, and saved report history.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "keywords": [
+    "ai-agent",
+    "research",
+    "express",
+    "mongodb",
+    "clerk",
+    "groq"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^5.1.0",
+    "@clerk/express": "^2.1.20",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
