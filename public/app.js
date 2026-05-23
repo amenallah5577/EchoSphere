@@ -51,9 +51,7 @@ async function fetchHistory() {
     const list = document.getElementById('historyList');
     list.innerHTML = '<div class="history-empty">Loading…</div>';
     try {
-        const token = window.Clerk && window.Clerk.session ? await window.Clerk.session.getToken() : null;
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const res = await fetch('/api/history', { headers });
+        const res = await fetch('/api/history');
         if (!res.ok) throw new Error('Failed to fetch');
         allHistory = await res.json();
         renderHistory(allHistory);
@@ -210,7 +208,6 @@ async function handleTask() {
         }, 1500);
 
         try {
-            const token = window.Clerk && window.Clerk.session ? await window.Clerk.session.getToken() : null;
             const formData = new FormData();
             formData.append('task', task);
             formData.append('history', JSON.stringify(currentSessionHistory));
@@ -219,7 +216,6 @@ async function handleTask() {
             }
             const response = await fetch('/api/dispatch', {
                 method: 'POST',
-                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
                 body: formData
             });
             const data = await response.json();
@@ -241,7 +237,6 @@ async function handleTask() {
     } else {
         // Fallback if status elements not present
         try {
-            const token = window.Clerk && window.Clerk.session ? await window.Clerk.session.getToken() : null;
             const formData = new FormData();
             formData.append('task', task);
             formData.append('history', JSON.stringify(currentSessionHistory));
@@ -250,7 +245,6 @@ async function handleTask() {
             }
             const response = await fetch('/api/dispatch', {
                 method: 'POST',
-                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
                 body: formData
             });
             const data = await response.json();
@@ -329,72 +323,9 @@ function sanitizeUrl(url) {
     return '#';
 }
 
-// ---- Clerk Authentication ----
-
-async function initClerk() {
-    if (!window.Clerk) {
-        // Clerk script not loaded — show a message so the user knows to configure their key
-        const inputArea = document.querySelector('.input-area');
-        if (inputArea) inputArea.classList.add('display-none');
-        const welcome = document.getElementById('welcomeScreen');
-        if (welcome) {
-            welcome.innerHTML = `
-                <div class="welcome-icon">⚠️</div>
-                <h2>Authentication Unavailable</h2>
-                <p>The authentication service could not be loaded. Please ensure the Clerk publishable key is configured.</p>`;
-        }
-        return;
-    }
-    await window.Clerk.load();
-
-    if (window.Clerk.user) {
-        // User is signed in — mount the UserButton profile widget
-        window.Clerk.mountUserButton(document.getElementById('user-button'));
-    } else {
-        // User is not signed in — hide the chat input and show a sign-in prompt
-        const inputArea = document.querySelector('.input-area');
-        if (inputArea) inputArea.classList.add('display-none');
-
-        const welcome = document.getElementById('welcomeScreen');
-        if (welcome) {
-            const signInBtn = document.createElement('button');
-            signInBtn.className = 'btn';
-            signInBtn.style.marginTop = '1rem';
-            signInBtn.textContent = 'Sign In';
-            signInBtn.addEventListener('click', () => window.Clerk.redirectToSignIn());
-
-            welcome.innerHTML = `
-                <div class="welcome-icon">🔒</div>
-                <h2>Welcome to EchoSphere</h2>
-                <p>Please sign in to access your personal workspace and history.</p>`;
-            welcome.appendChild(signInBtn);
-        }
-    }
-}
-
 // ---- Init ----
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Fetch the Clerk publishable key from the backend, then dynamically load the Clerk script
-    fetch('/api/config')
-        .then(res => res.json())
-        .then(config => {
-            if (config.clerkPubKey) {
-                const script = document.createElement('script');
-                script.setAttribute('data-clerk-publishable-key', config.clerkPubKey);
-                script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
-                script.crossOrigin = 'anonymous';
-                script.onload = () => initClerk();
-                document.head.appendChild(script);
-            } else {
-                initClerk();
-            }
-        })
-        .catch(err => {
-            console.error('Failed to fetch /api/config:', err);
-            initClerk();
-        });
-
     // Inject status bar into feed if not present
     const feed = document.getElementById('feed');
     if (feed && !document.getElementById('loadingStatus')) {

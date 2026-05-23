@@ -1,7 +1,7 @@
 {
   "name": "ecosphere",
   "version": "1.0.0",
-  "description": "EchoSphere is an authenticated AI research workspace for web intelligence, PDF analysis, and saved report history.",
+  "description": "EchoSphere is an AI research workspace for web intelligence, PDF analysis, and saved report history.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,18 +12,17 @@
     "research",
     "express",
     "mongodb",
-    "clerk",
     "groq"
   ],
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "@clerk/express": "^2.1.20",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-basic-auth": "^1.2.1",
+    "express-rate-limit": "^8.5.2",
     "groq-sdk": "^0.3.3",
     "mongoose": "^8.3.0",
     "multer": "^2.1.1",
