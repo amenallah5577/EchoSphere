@@ -33,8 +33,8 @@ EchoSphere is an authenticated AI research workspace for turning web searches an
 ## Getting Started
 
 ```bash
-git clone https://github.com/amenallah5577/ecosphere.git
-cd ecosphere
+git clone https://github.com/amenallah5577/EchoSphere.git
+cd EchoSphere
 npm install
 cp .env.example .env
 npm run check
