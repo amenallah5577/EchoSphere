@@ -6,10 +6,9 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
-const { clerkMiddleware, getAuth } = require('@clerk/express');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
-app.use(clerkMiddleware());
 app.use(cors());
 app.use(express.json());
 
@@ -29,26 +28,6 @@ app.get('/admin.html', adminLock, (req, res) => {
     res.sendFile(__dirname + '/public/admin.html');
 });
 
-// Clerk auth middleware - returns 401 JSON if the request is unauthenticated
-function clerkAuth(req, res, next) {
-    const auth = getAuth(req);
-    if (!auth.userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-    req.auth = auth;
-    next();
-}
-// ---------------------
-
-// Expose the Clerk publishable key to the frontend
-app.get('/api/config', (req, res) => {
-    const clerkPubKey = process.env.CLERK_PUBLISHABLE_KEY;
-    if (!clerkPubKey) {
-        return res.status(503).json({ error: 'CLERK_PUBLISHABLE_KEY is not configured on the server.' });
-    }
-    res.json({ clerkPubKey });
-});
-
 // Serve all other public files normally
 app.use(express.static('public'));
 
@@ -62,10 +41,15 @@ const HistorySchema = new mongoose.Schema({
     prompt: String,
     title: String,
     url: String,
-    userId: String,
     date: { type: Date, default: Date.now }
 });
 const History = mongoose.model('History', HistorySchema);
+const historyLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -151,7 +135,7 @@ async function searchWebForAgent(query) {
     return data;
 }
 
-app.post('/api/dispatch', clerkAuth, upload.single('file'), async (req, res) => {
+app.post('/api/dispatch', upload.single('file'), async (req, res) => {
     try {
         const task = req.body.task;
         // history may arrive as a JSON string (from FormData) or as an array (from JSON body)
@@ -226,8 +210,7 @@ Respond ONLY in valid JSON using this exact schema:
             const newHistory = new History({
                 prompt: task,
                 title: agentResponse.title,
-                url: agentResponse.realUrl,
-                userId: req.auth.userId
+                url: agentResponse.realUrl
             });
             await newHistory.save();
         } catch (dbErr) {
@@ -242,9 +225,9 @@ Respond ONLY in valid JSON using this exact schema:
     }
 });
 
-app.get('/api/history', clerkAuth, async (req, res) => {
+app.get('/api/history', historyLimiter, async (req, res) => {
     try {
-        const history = await History.find({ userId: req.auth.userId }).sort({ date: -1 }).limit(50);
+        const history = await History.find({}).sort({ date: -1 }).limit(50);
         res.json(history);
     } catch (err) {
         res.status(500).json({ error: "Could not fetch history" });
