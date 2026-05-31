@@ -128,36 +128,56 @@ function autoResize(textarea) {
 // ---- PDF UI ----
 
 let attachedPdfFile = null;
+const MAX_PDF_SIZE = 5 * 1024 * 1024;
 
 function togglePdfManager() {
     const manager = document.getElementById('inlinePdfManager');
     manager.classList.toggle('display-none');
 }
 
-function mockFileUpload() {
+function browsePdfFiles() {
     const pdfInput = document.getElementById('pdfInput');
     pdfInput.value = '';
-    pdfInput.onchange = (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        attachedPdfFile = file;
-        const nameEl = document.querySelector('#pdfAttached .pdf-chip span');
-        if (nameEl) nameEl.textContent = file.name;
-        document.getElementById('uploadZone').classList.add('display-none');
-        document.getElementById('pdfAttached').classList.remove('display-none');
-    };
     pdfInput.click();
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function showPdfError(message) {
+    const error = document.getElementById('pdfError');
+    error.textContent = message;
+    error.classList.toggle('display-none', !message);
+}
+
+function attachPdf(file) {
+    showPdfError('');
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        showPdfError('Only PDF documents can be analyzed.');
+        return;
+    }
+
+    if (file.size > MAX_PDF_SIZE) {
+        showPdfError('PDF files must be 5 MB or smaller.');
+        return;
+    }
+
+    attachedPdfFile = file;
+    document.getElementById('pdfFileName').textContent = file.name;
+    document.getElementById('pdfFileSize').textContent = formatFileSize(file.size);
+    document.getElementById('uploadZone').classList.add('display-none');
+    document.getElementById('pdfAttached').classList.remove('display-none');
 }
 
 function removeAttachedPdf() {
     attachedPdfFile = null;
+    showPdfError('');
     document.getElementById('pdfAttached').classList.add('display-none');
-    document.getElementById('inlinePdfViewer').classList.add('display-none');
     document.getElementById('uploadZone').classList.remove('display-none');
-}
-
-function togglePdfViewer() {
-    document.getElementById('inlinePdfViewer').classList.toggle('display-none');
 }
 
 // ---- Core Task Handling ----
@@ -195,10 +215,10 @@ async function handleTask() {
     if (statusEl && statusText) {
         statusEl.classList.add('active');
         const phases = [
-            'Querying external data sources…',
-            'Deep-scraping top results…',
-            'Reasoning through the data…',
-            'Formatting protocol response…'
+            'Discovering relevant web sources…',
+            'Comparing evidence across sources…',
+            attachedPdfFile ? 'Reading the attached PDF in memory…' : 'Structuring the academic brief…',
+            'Preparing the cited research note…'
         ];
         let phaseIndex = 0;
         statusText.textContent = phases[0];
@@ -271,7 +291,7 @@ function renderCard(data) {
     const safeUrl = sanitizeUrl(data.realUrl);
     const formattedDesc = escapeHtml(data.desc || '').replace(/\n/g, '<br>');
     card.innerHTML = `
-        <div class="card-icon">${data.icon || '⚡'}</div>
+        <div class="card-icon">${escapeHtml(data.icon || '⚡')}</div>
         <div class="card-content">
             <h3>${escapeHtml(data.title || '')}</h3>
             <p>${formattedDesc}</p>
@@ -287,12 +307,12 @@ function renderCard(data) {
         window.open(safeUrl, '_blank', 'noopener,noreferrer');
     });
     card.querySelector('.js-download-action').addEventListener('click', () => {
-        const reportText = (data.title || '') + '\n\n' + (data.desc || '');
-        const blob = new Blob([reportText], { type: 'text/plain' });
+        const reportText = `# ${data.title || 'EchoSphere research brief'}\n\n${data.desc || ''}\n\n## Source\n\n${safeUrl === '#' ? 'No verified source link was returned.' : `- ${safeUrl}`}\n`;
+        const blob = new Blob([reportText], { type: 'text/markdown;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = (data.title || 'report').replace(/[^a-z0-9_\-. ]/gi, '_') + '.txt';
+        a.download = (data.title || 'ecosphere-research-brief').replace(/[^a-z0-9_\-. ]/gi, '_') + '.md';
         a.click();
         URL.revokeObjectURL(url);
     });
@@ -326,6 +346,23 @@ function sanitizeUrl(url) {
 // ---- Init ----
 
 document.addEventListener('DOMContentLoaded', () => {
+    const pdfInput = document.getElementById('pdfInput');
+    const uploadZone = document.getElementById('uploadZone');
+    pdfInput.addEventListener('change', (event) => attachPdf(event.target.files && event.target.files[0]));
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, event => {
+            event.preventDefault();
+            uploadZone.classList.add('dragging');
+        });
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, event => {
+            event.preventDefault();
+            uploadZone.classList.remove('dragging');
+        });
+    });
+    uploadZone.addEventListener('drop', event => attachPdf(event.dataTransfer.files[0]));
+
     // Inject status bar into feed if not present
     const feed = document.getElementById('feed');
     if (feed && !document.getElementById('loadingStatus')) {
