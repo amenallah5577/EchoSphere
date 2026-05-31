@@ -13,7 +13,17 @@ app.use(cors());
 app.use(express.json());
 
 // Memory-only storage — no files are written to disk
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_PDF_SIZE = 5 * 1024 * 1024;
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_PDF_SIZE },
+    fileFilter: (req, file, callback) => {
+        if (file.mimetype !== 'application/pdf') {
+            return callback(new Error('Only PDF documents can be analyzed.'));
+        }
+        callback(null, true);
+    }
+});
 
 // --- SECURITY LOCK ---
 // This requires a password for /admin.html only
@@ -49,6 +59,13 @@ const historyLimiter = rateLimit({
     max: 60,
     standardHeaders: true,
     legacyHeaders: false
+});
+const dispatchLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many research requests. Please try again in a few minutes.' }
 });
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -135,9 +152,12 @@ async function searchWebForAgent(query) {
     return data;
 }
 
-app.post('/api/dispatch', upload.single('file'), async (req, res) => {
+app.post('/api/dispatch', dispatchLimiter, upload.single('file'), async (req, res) => {
     try {
-        const task = req.body.task;
+        const task = typeof req.body.task === 'string' ? req.body.task.trim() : '';
+        if (task.length < 3 || task.length > 1000) {
+            return res.status(400).json({ error: 'Research questions must contain between 3 and 1000 characters.' });
+        }
         // history may arrive as a JSON string (from FormData) or as an array (from JSON body)
         let history = req.body.history;
         if (typeof history === 'string') {
@@ -241,6 +261,16 @@ app.get('/api/admin/history', adminLock, async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: "Could not fetch admin history" });
     }
+});
+
+app.use((error, req, res, next) => {
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'PDF files must be 5 MB or smaller.' });
+    }
+    if (error) {
+        return res.status(400).json({ error: error.message || 'The upload could not be processed.' });
+    }
+    next();
 });
 
 const PORT = process.env.PORT || 3000;

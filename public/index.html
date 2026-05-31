@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EchoSphere | Enterprise Agent</title>
+    <title>EchoSphere | Research Assistant</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -20,7 +20,7 @@
         <div class="sidebar-header">
             <button class="new-chat-btn" onclick="startNewChat()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                New Workspace
+                New Research
             </button>
             <button class="icon-btn close-sidebar" onclick="toggleLeftSidebar()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -29,7 +29,7 @@
         
         <div class="search-box">
             <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="historySearch" placeholder="Search history..." oninput="filterHistory()">
+            <input type="text" id="historySearch" placeholder="Search research history..." oninput="filterHistory()">
         </div>
 
         <div class="history-list" id="historyList">
@@ -49,7 +49,7 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                     </div>
                     EchoSphere
-                    <span class="workspace-badge">Agent Pro</span>
+                    <span class="workspace-badge">Research AI</span>
                 </div>
             </div>
             
@@ -64,17 +64,25 @@
         <div id="feed" class="feed">
             <div class="welcome-container" id="welcomeScreen">
                 <div class="welcome-icon">⚡</div>
-                <h2>Good morning.</h2>
-                <p>EchoSphere is ready. What would you like to build or analyze today?</p>
-                
+                <h2>Research with clearer evidence.</h2>
+                <p>Explore a topic, compare sources, find practical opportunities, or attach a PDF for a structured brief.</p>
+
                 <div class="quick-actions-grid">
-                    <div class="action-card" onclick="setInput('Analyze Q3 financial report from the attached PDF')">
+                    <div class="action-card" onclick="setInput('Research a topic and compare the most relevant recent sources, key findings, and source links')">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                        Financial Analysis
+                        Topic Research
                     </div>
-                    <div class="action-card" onclick="setInput('Find remote React Developer jobs posted this week')">
+                    <div class="action-card" onclick="setInput('Summarize the attached course PDF and connect it to current sources')">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-                        Market Research
+                        Course PDF Analysis
+                    </div>
+                    <div class="action-card" onclick="setInput('Search marketplaces for products that match my needs and compare prices, specifications, availability, and source links. Ask me what product, location, and budget I want to use.')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/><path d="M8 20h8"/></svg>
+                        Marketplace Search
+                    </div>
+                    <div class="action-card" onclick="setInput('Find entry-level job opportunities in Tunisia posted recently and summarize the role, location, requirements, and application link')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 12h20"/></svg>
+                        Job Opportunity Search
                     </div>
                 </div>
             </div>
@@ -86,7 +94,7 @@
             <div class="inline-pdf-ui display-none" id="inlinePdfManager">
                 <div class="upload-zone" id="uploadZone">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="12" y2="12"></line><line x1="15" y1="15" x2="12" y2="12"></line></svg>
-                    <p>Drop PDF to attach, or <span class="text-accent" onclick="mockFileUpload()">Browse files</span></p>
+                    <p>Drop one PDF here, or <span class="text-accent" onclick="browsePdfFiles()">browse files</span>. Maximum size: 5 MB. An attached file is analyzed in memory.</p>
                     <button class="icon-btn close-pdf-btn" onclick="togglePdfManager()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
@@ -94,45 +102,29 @@
 
                 <!-- PDF Document Chip & Viewer -->
                 <div class="pdf-attached display-none" id="pdfAttached">
-                    <div class="pdf-chip" onclick="togglePdfViewer()">
+                    <div class="pdf-chip">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                        <span>Financial_Report_Q3.pdf</span>
+                        <span id="pdfFileName">course-document.pdf</span>
+                        <small id="pdfFileSize"></small>
                     </div>
                     <button class="icon-btn remove-pdf-btn" onclick="removeAttachedPdf()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                 </div>
-                
-                <!-- Expanded Inline Viewer -->
-                <div class="inline-pdf-viewer display-none" id="inlinePdfViewer">
-                    <div class="pdf-toolbar">
-                        <span class="pdf-title">Page 1 of 12</span>
-                        <div class="pdf-controls">
-                            <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
-                            <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
-                        </div>
-                    </div>
-                    <div class="pdf-page-mock">
-                        <div class="pdf-skeleton title"></div>
-                        <div class="pdf-skeleton line"></div>
-                        <div class="pdf-skeleton line short"></div>
-                        <div class="pdf-skeleton image"></div>
-                        <div class="pdf-skeleton line"></div>
-                    </div>
-                </div>
+                <p class="pdf-error display-none" id="pdfError" role="alert"></p>
             </div>
 
             <div class="input-wrapper">
                 <button class="attach-btn" title="Attach file" onclick="togglePdfManager()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                 </button>
-                <textarea id="taskInput" placeholder="Send a message to EchoSphere..." rows="1" onkeypress="handleKeyPress(event)" oninput="autoResize(this)"></textarea>
+                <textarea id="taskInput" placeholder="Ask a research question or practical search..." rows="1" onkeypress="handleKeyPress(event)" oninput="autoResize(this)"></textarea>
                 <button class="send-btn" id="sendBtn" onclick="handleTask()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
             </div>
             <div class="input-footer-text">
-                EchoSphere Agent can make mistakes. Consider verifying critical information.
+                Review sources before using a brief or making a decision. EchoSphere supports research; it does not replace your judgment.
             </div>
         </div>
     </main>
