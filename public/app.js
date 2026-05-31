@@ -40,6 +40,7 @@ function startNewChat() {
     });
     document.getElementById('welcomeScreen').classList.remove('display-none');
     currentSessionHistory = [];
+    updateWelcomeMessage(false);
     toggleLeftSidebar();
 }
 
@@ -51,7 +52,10 @@ async function fetchHistory() {
     const list = document.getElementById('historyList');
     list.innerHTML = '<div class="history-empty">Loading…</div>';
     try {
-        const res = await fetch('/api/history');
+        const res = await fetch('/api/history', {
+            headers: await getAuthHeaders(),
+            credentials: 'same-origin'
+        });
         if (!res.ok) throw new Error('Failed to fetch');
         allHistory = await res.json();
         renderHistory(allHistory);
@@ -90,6 +94,151 @@ function filterHistory() {
         (item.prompt || '').toLowerCase().includes(q)
     );
     renderHistory(filtered);
+}
+
+// ---- Optional Accounts ----
+
+let clerkReady = false;
+let clerkConfigured = false;
+
+function setAuthButtonsEnabled(enabled) {
+    ['signInBtn', 'signUpBtn'].forEach(id => {
+        const button = document.getElementById(id);
+        button.disabled = !enabled;
+        button.classList.toggle('display-none', !enabled);
+        button.title = enabled ? '' : 'Account sign-in is not configured yet. Guest mode remains available.';
+    });
+}
+
+function loadExternalScript(src, attributes = {}) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        Object.entries(attributes).forEach(([name, value]) => script.setAttribute(name, value));
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Could not load ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+function getDisplayName() {
+    if (!clerkReady || !window.Clerk.user) return '';
+    return window.Clerk.user.firstName || '';
+}
+
+async function getAuthHeaders() {
+    if (!clerkReady || !window.Clerk.session) return {};
+    try {
+        const token = await window.Clerk.session.getToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    } catch (error) {
+        console.error('Could not read the current account token:', error);
+        return {};
+    }
+}
+
+function updateAuthUi() {
+    const signedIn = clerkReady && window.Clerk.isSignedIn;
+    const label = document.getElementById('sessionLabel');
+    const signIn = document.getElementById('signInBtn');
+    const signUp = document.getElementById('signUpBtn');
+    const userButton = document.getElementById('userButton');
+
+    label.textContent = signedIn ? `${getDisplayName() || 'Account'} workspace` : 'Guest workspace';
+    signIn.classList.toggle('display-none', signedIn);
+    signUp.classList.toggle('display-none', signedIn);
+    userButton.classList.toggle('display-none', !signedIn);
+
+    if (signedIn && !userButton.hasChildNodes()) {
+        window.Clerk.mountUserButton(userButton);
+    }
+
+    updateWelcomeMessage(false);
+}
+
+async function initOptionalAuth() {
+    setAuthButtonsEnabled(false);
+    try {
+        const response = await fetch('/api/config', { credentials: 'same-origin' });
+        const config = await response.json();
+        clerkConfigured = Boolean(config.clerkEnabled && config.clerkPublishableKey);
+        if (!clerkConfigured) return;
+
+        const clerkDomain = atob(config.clerkPublishableKey.split('_')[2]).slice(0, -1);
+        await loadExternalScript(`https://${clerkDomain}/npm/@clerk/ui@1/dist/ui.browser.js`);
+        await loadExternalScript(
+            `https://${clerkDomain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
+            { 'data-clerk-publishable-key': config.clerkPublishableKey }
+        );
+        await window.Clerk.load({
+            ui: { ClerkUI: window.__internal_ClerkUICtor }
+        });
+
+        clerkReady = true;
+        setAuthButtonsEnabled(true);
+        updateAuthUi();
+        window.Clerk.addListener(() => {
+            updateAuthUi();
+            allHistory = [];
+            if (document.getElementById('leftSidebar').classList.contains('open')) fetchHistory();
+        });
+    } catch (error) {
+        console.error('Optional account sign-in could not be initialized:', error);
+    }
+}
+
+function openAuthModal(mode) {
+    const modal = document.getElementById('authModal');
+    const mount = document.getElementById('authMount');
+    const title = document.getElementById('authModalTitle');
+    modal.classList.remove('display-none');
+    title.textContent = mode === 'sign-up' ? 'Create your EchoSphere account' : 'Sign in to EchoSphere';
+    mount.innerHTML = '';
+
+    if (!clerkReady) {
+        mount.innerHTML = clerkConfigured
+            ? '<p class="auth-unavailable">Account sign-in is still loading. You can continue in guest mode.</p>'
+            : '<p class="auth-unavailable">Account sign-in will be available after the authentication keys are configured. Guest mode is ready now.</p>';
+        return;
+    }
+
+    if (mode === 'sign-up') {
+        window.Clerk.mountSignUp(mount);
+    } else {
+        window.Clerk.mountSignIn(mount);
+    }
+}
+
+function closeAuthModal() {
+    document.getElementById('authModal').classList.add('display-none');
+    document.getElementById('authMount').innerHTML = '';
+}
+
+// ---- Dynamic Welcome ----
+
+const welcomeMessages = [
+    'What would you like to explore today?',
+    'Ask a question, compare options, or look for a new opportunity.',
+    'Start with a topic, a marketplace search, a job search, or a PDF.',
+    'Your next useful answer can start with one clear question.'
+];
+let currentWelcomeMessageIndex = 0;
+
+function updateWelcomeMessage(rotate = true) {
+    const hour = new Date().getHours();
+    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+    const name = getDisplayName();
+
+    if (rotate) {
+        const previous = Number(localStorage.getItem('echosphere-welcome-message') || '-1');
+        currentWelcomeMessageIndex = (previous + 1) % welcomeMessages.length;
+        localStorage.setItem('echosphere-welcome-message', String(currentWelcomeMessageIndex));
+    }
+
+    document.getElementById('welcomeGreeting').textContent = `Good ${period}${name ? `, ${name}` : ''}.`;
+    document.getElementById('welcomeMessage').textContent = welcomeMessages[currentWelcomeMessageIndex];
 }
 
 // ---- Theme ----
@@ -236,6 +385,8 @@ async function handleTask() {
             }
             const response = await fetch('/api/dispatch', {
                 method: 'POST',
+                headers: await getAuthHeaders(),
+                credentials: 'same-origin',
                 body: formData
             });
             const data = await response.json();
@@ -265,6 +416,8 @@ async function handleTask() {
             }
             const response = await fetch('/api/dispatch', {
                 method: 'POST',
+                headers: await getAuthHeaders(),
+                credentials: 'same-origin',
                 body: formData
             });
             const data = await response.json();
@@ -362,6 +515,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     uploadZone.addEventListener('drop', event => attachPdf(event.dataTransfer.files[0]));
+    document.getElementById('authModal').addEventListener('click', event => {
+        if (event.target.id === 'authModal') closeAuthModal();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeAuthModal();
+    });
+    updateWelcomeMessage(true);
+    initOptionalAuth();
 
     // Inject status bar into feed if not present
     const feed = document.getElementById('feed');
