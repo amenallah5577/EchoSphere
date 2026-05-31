@@ -1,16 +1,48 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const Groq = require('groq-sdk');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
+const { clerkMiddleware, getAuth } = require('@clerk/express');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const rateLimit = require('express-rate-limit');
+const { getOrCreateGuestSession } = require('./lib/session');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const clerkEnabled = Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY);
+if (clerkEnabled) {
+    app.use(clerkMiddleware({
+        publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+        secretKey: process.env.CLERK_SECRET_KEY
+    }));
+}
+
+const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) {
+    console.warn('SESSION_SECRET is not configured. Guest sessions will reset when the server restarts.');
+}
+
+function profileMiddleware(req, res, next) {
+    if (clerkEnabled) {
+        const auth = getAuth(req);
+        if (auth.isAuthenticated && auth.userId) {
+            req.profile = { mode: 'account', ownerId: `user:${auth.userId}` };
+            return next();
+        }
+    }
+
+    const guestId = getOrCreateGuestSession(req, res, sessionSecret, {
+        secure: process.env.NODE_ENV === 'production'
+    });
+    req.profile = { mode: 'guest', ownerId: `guest:${guestId}` };
+    next();
+}
 
 // Memory-only storage — no files are written to disk
 const MAX_PDF_SIZE = 5 * 1024 * 1024;
@@ -26,16 +58,31 @@ const upload = multer({
 });
 
 // --- SECURITY LOCK ---
-// This requires a password for /admin.html only
-const adminLock = basicAuth({
-    users: { [process.env.ADMIN_USERNAME || 'admin']: process.env.ADMIN_PASSWORD || 'password123' },
-    challenge: true,
-    realm: 'Secure Admin Area'
-});
+const adminCredentialsConfigured = Boolean(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
+const adminLock = adminCredentialsConfigured
+    ? basicAuth({
+        users: { [process.env.ADMIN_USERNAME]: process.env.ADMIN_PASSWORD },
+        challenge: true,
+        realm: 'Secure Admin Area'
+    })
+    : (req, res) => res.status(404).send('Not found');
 
 // Protect the HTML page
 app.get('/admin.html', adminLock, (req, res) => {
     res.sendFile(__dirname + '/public/admin.html');
+});
+
+app.get('/api/config', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({
+        clerkEnabled,
+        clerkPublishableKey: clerkEnabled ? process.env.CLERK_PUBLISHABLE_KEY : null
+    });
+});
+
+app.get('/api/profile', profileMiddleware, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ mode: req.profile.mode });
 });
 
 // Serve all other public files normally
@@ -48,6 +95,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Define Database Schema
 const HistorySchema = new mongoose.Schema({
+    ownerId: { type: String, index: true },
     prompt: String,
     title: String,
     url: String,
@@ -152,7 +200,7 @@ async function searchWebForAgent(query) {
     return data;
 }
 
-app.post('/api/dispatch', dispatchLimiter, upload.single('file'), async (req, res) => {
+app.post('/api/dispatch', dispatchLimiter, profileMiddleware, upload.single('file'), async (req, res) => {
     try {
         const task = typeof req.body.task === 'string' ? req.body.task.trim() : '';
         if (task.length < 3 || task.length > 1000) {
@@ -228,6 +276,7 @@ Respond ONLY in valid JSON using this exact schema:
         // Save to Database
         try {
             const newHistory = new History({
+                ownerId: req.profile.ownerId,
                 prompt: task,
                 title: agentResponse.title,
                 url: agentResponse.realUrl
@@ -245,9 +294,10 @@ Respond ONLY in valid JSON using this exact schema:
     }
 });
 
-app.get('/api/history', historyLimiter, async (req, res) => {
+app.get('/api/history', historyLimiter, profileMiddleware, async (req, res) => {
     try {
-        const history = await History.find({}).sort({ date: -1 }).limit(50);
+        const history = await History.find({ ownerId: req.profile.ownerId }).sort({ date: -1 }).limit(50);
+        res.set('Cache-Control', 'no-store');
         res.json(history);
     } catch (err) {
         res.status(500).json({ error: "Could not fetch history" });
