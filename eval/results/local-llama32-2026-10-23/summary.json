@@ -1,0 +1,26 @@
+{
+  "completedAt": "2026-10-23T15:29:51.212Z",
+  "partial": false,
+  "configurations": {
+    "report-v1": {
+      "attempted": 30,
+      "completed": 30,
+      "errors": 0,
+      "factCoverage": 0.6777777777777777,
+      "citationMatchRate": 1,
+      "rubricPassRate": 0.5,
+      "latencyMedianMs": 3481,
+      "latencyP95Ms": 5359
+    },
+    "grounded-v2": {
+      "attempted": 30,
+      "completed": 30,
+      "errors": 0,
+      "factCoverage": 0.6038888888888889,
+      "citationMatchRate": 1,
+      "rubricPassRate": 0.4666666666666667,
+      "latencyMedianMs": 2786,
+      "latencyP95Ms": 4267
+    }
+  }
+}

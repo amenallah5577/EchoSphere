@@ -34,7 +34,7 @@ EchoSphere is an AI research workspace for turning web searches and uploaded PDF
 ```bash
 git clone https://github.com/amenallah5577/EchoSphere.git
 cd EchoSphere
-npm install
+npm ci
 cp .env.example .env
 npm run check
 npm start
@@ -50,6 +50,7 @@ Copy `.env.example` to `.env`, then fill in:
 | --- | --- |
 | `MONGODB_URI` | MongoDB connection string for saved report history. |
 | `GROQ_API_KEY` | Groq API key for report generation. |
+| `GROQ_MODEL` | Available Groq model ID with JSON object mode; explicitly required for research. |
 | `TAVILY_API_KEY` | Tavily API key for live web search. |
 | `SESSION_SECRET` | Long random secret used to sign anonymous browser sessions. |
 | `CLERK_SECRET_KEY` | Optional Clerk backend key. Enable together with `CLERK_PUBLISHABLE_KEY`. |
@@ -70,12 +71,20 @@ Copy `.env.example` to `.env`, then fill in:
 
 ## Quality Checks
 
+See [verified local setup and the retrieval trade-off](docs/engineering.md). Hosted research and history failed the latest workflow check; use the local setup until deployment configuration is repaired.
+
 ```bash
 npm run check
+npm test
+npm run eval:check
 npm audit
 ```
 
 `npm run check` validates the server syntax. `npm audit` is useful before releases because upstream provider SDK advisories can change over time.
+
+### Grounded-generation evaluation
+
+The [30-case evaluation suite](eval/README.md) compares two candidate prompts against identical frozen reference sources. A [reviewed local Ollama run](eval/results/local-llama32-2026-10-23/findings.md) records answer quality, source support, prompt-injection failures and median/p95 request latency. It does not measure the hosted Groq application.
 
 ## Optional Clerk Accounts
 
