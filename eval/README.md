@@ -22,6 +22,21 @@ The dry run validates all 30 cases, their source references and regex rubrics, a
 
 ## Configure and run live
 
+### Local alternative without a cloud key
+
+The same dataset and prompt comparison can run against an installed Ollama model:
+
+```sh
+ollama serve
+# In another terminal, after installing the model if necessary:
+npm run eval:run -- --provider ollama --model llama3.2:latest --limit 1
+npm run eval:run -- --provider ollama --model llama3.2:latest
+```
+
+The local endpoint is fixed to `127.0.0.1:11434` and receives no Groq credential. Record the Ollama version, model digest, quantization, hardware and warm-up policy alongside a published run. These results evaluate candidate EchoSphere generation prompts on a local model; they do not measure the deployed Groq model or hosted application. Do not compare local latency with cloud latency as if only the prompt changed. A cold model can take longer to load than the 60-second request timeout; use a separate smoke run to warm it, and report that policy.
+
+### Groq
+
 1. Create a key in the [Groq console](https://console.groq.com/keys), following the [official quickstart](https://console.groq.com/docs/quickstart).
 2. Create a local `.env` at the repository root with `GROQ_API_KEY=...`. This file is ignored by Git. Do not paste the key into a chat, README or commit. The evaluation needs no MongoDB, Tavily or Clerk credentials.
 3. Choose a model that is enabled for your account and supports JSON object mode from [Groq's model catalog](https://console.groq.com/docs/models). Supply its exact ID with `--model`. There is intentionally no implicit model fallback. Groq's [deprecation notice](https://console.groq.com/docs/deprecations) lists the application's hard-coded `llama-3.3-70b-versatile` as retired for free/developer usage on 16 August 2026; enterprise availability differs. This harness does not change the deployed application.

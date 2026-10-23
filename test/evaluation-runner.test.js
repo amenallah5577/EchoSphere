@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-function runFixture(t, status) {
+function runFixture(t, status, provider = 'groq') {
   const temporaryRoot = fs.realpathSync(os.tmpdir());
   const directory = fs.mkdtempSync(path.join(temporaryRoot, 'echosphere-eval-test-'));
   t.after(() => {
@@ -19,16 +19,18 @@ function runFixture(t, status) {
   // The subprocess cannot reach a provider: replace fetch before loading the runner.
   fs.writeFileSync(preload, `
     process.env.GROQ_API_KEY = 'fixture-key-not-a-credential';
-    global.fetch = async () => ({
+    global.fetch = async (url, options) => {
+      if ('${provider}' === 'ollama' && options.headers.Authorization) throw new Error('Credential leaked to local provider');
+      return ({
       ok: ${status === 200}, status: ${status},
       json: async () => ({ model: 'fixture-only', usage: { total_tokens: 1 },
         choices: [{ message: { content: JSON.stringify({ title: 'Pilot',
           desc: '48 enrolled; 36 completed.', metrics: [],
           realUrl: 'https://example.test/echosphere/pilot' }) } }] })
-    });
+    }); };
   `);
   const result = spawnSync(process.execPath, ['--require', preload, path.resolve(__dirname, '../eval/run.js'),
-    '--model', 'fixture-only', '--limit', '1', '--out', output], { encoding: 'utf8' });
+    '--provider', provider, '--model', 'fixture-only', '--limit', '1', '--out', output], { encoding: 'utf8' });
   assert.equal(result.error, undefined);
   const raw = fs.readFileSync(path.join(output, 'responses.jsonl'), 'utf8');
   assert.ok(!raw.includes('fixture-key-not-a-credential'));
@@ -62,4 +64,10 @@ test('runner stops at rejected credentials without evaluating the second prompt'
   assert.equal(rows.length, 1);
   assert.equal(summary.partial, true);
   assert.equal(summary.configurations['report-v1'].latencyMedianMs, null);
+});
+
+test('local-provider comparison never forwards the Groq credential', t => {
+  const { result, rows } = runFixture(t, 200, 'ollama');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(rows.length, 2);
 });

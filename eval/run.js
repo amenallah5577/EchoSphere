@@ -11,9 +11,11 @@ async function main() {
     'dry-run': { type: 'boolean', default: false },
     limit: { type: 'string', default: '30' }, repeats: { type: 'string', default: '1' },
     'env-file': { type: 'string' }, model: { type: 'string' },
+    provider: { type: 'string', default: 'groq' },
     out: { type: 'string' }
   } });
   const limit = Number(values.limit), repeats = Number(values.repeats);
+  if (!['groq', 'ollama'].includes(values.provider)) throw new Error('Use --provider groq or ollama.');
   if (!Number.isInteger(limit) || limit < 1 || limit > 30 || !Number.isInteger(repeats) || repeats < 1 || repeats > 5) {
     throw new Error('Use --limit 1..30 and --repeats 1..5.');
   }
@@ -28,7 +30,7 @@ async function main() {
   try { commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim(); } catch {}
   const metadata = {
     mode: values['dry-run'] ? 'dry-run' : 'live', startedAt: new Date().toISOString(), commit,
-    model: values.model || null, temperature: 0.3, maxCompletionTokens: 900, repeats,
+    provider: values.provider, model: values.model || null, temperature: 0.3, maxCompletionTokens: 900, repeats,
     caseCount: cases.length, plannedCalls: cases.length * repeats * configurations.length,
     datasetSha256: digest(datasetBytes), sourcesSha256: digest(sourceBytes),
     configurations: configurations.map(c => ({ ...c, sha256: digest(c.system) })),
@@ -39,8 +41,9 @@ async function main() {
     return;
   }
   require('dotenv').config({ path: values['env-file'] || path.join(__dirname, '../.env') });
-  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key') throw new Error('GROQ_API_KEY is required. No requests sent and no model results produced. See eval/README.md.');
-  if (!values.model?.trim()) throw new Error('--model is required for a live run. Choose an available Groq model with JSON object mode; see eval/README.md.');
+  if (values.provider === 'groq' && (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key')) throw new Error('GROQ_API_KEY is required. No requests sent and no model results produced. See eval/README.md.');
+  if (!values.model?.trim()) throw new Error('--model is required for a live run. Choose an available model with JSON object mode; see eval/README.md.');
+  const endpoint = values.provider === 'ollama' ? 'http://127.0.0.1:11434/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions';
   const output = path.resolve(values.out || path.join(__dirname, 'runs', new Date().toISOString().replace(/[:.]/g, '-')));
   fs.mkdirSync(output, { recursive: true });
   const rawPath = path.join(output, 'responses.jsonl');
@@ -59,10 +62,11 @@ async function main() {
         const start = performance.now();
         const row = { caseId: testCase.id, category: testCase.category, configuration: config.id, repetition };
         try {
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          const response = await fetch(endpoint, {
             method: 'POST', signal: AbortSignal.timeout(60000),
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-            body: JSON.stringify({ model: values.model, temperature: metadata.temperature, max_completion_tokens: 900,
+            headers: { 'Content-Type': 'application/json', ...(values.provider === 'groq' ? { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } : {}) },
+            body: JSON.stringify({ model: values.model, temperature: metadata.temperature,
+              ...(values.provider === 'ollama' ? { max_tokens: 900 } : { max_completion_tokens: 900 }),
               response_format: { type: 'json_object' }, messages: [
                 { role: 'system', content: config.system },
                 { role: 'user', content: JSON.stringify({ question: testCase.question, sources: evidence }) }
@@ -94,7 +98,7 @@ async function main() {
     configurations: Object.fromEntries(configurations.map(c => [c.id, summarize(rows.filter(r => r.configuration === c.id))])) };
   fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2));
   const lines = ['# EchoSphere evaluation run', '', `Model: ${values.model}. Partial run: ${summary.partial}.`, '',
-    '| Prompt | Completed / attempted | Fact coverage proxy | Gold source match | Rubric pass | Median ms | p95 ms |',
+    `Provider: ${values.provider}.`, '', '| Prompt | Completed / attempted | Fact coverage proxy | Gold source match | Rubric pass | Median ms | p95 ms |',
     '| --- | --- | --- | --- | --- | --- | --- |'];
   const percent = n => n === null ? 'N/A' : `${(n * 100).toFixed(1)}%`;
   for (const [id, s] of Object.entries(summary.configurations)) lines.push(`| ${id} | ${s.completed} / ${s.attempted} | ${percent(s.factCoverage)} | ${percent(s.citationMatchRate)} | ${percent(s.rubricPassRate)} | ${s.latencyMedianMs ?? 'N/A'} | ${s.latencyP95Ms ?? 'N/A'} |`);

@@ -390,6 +390,7 @@ async function handleTask() {
                 body: formData
             });
             const data = await response.json();
+            if (!response.ok || data.error) throw new Error(data.error || 'Research request failed.');
             clearInterval(phaseInterval);
             statusEl.classList.remove('active');
             loadingCard.remove();
@@ -401,6 +402,7 @@ async function handleTask() {
         } catch (err) {
             clearInterval(phaseInterval);
             console.error('Agent request failed:', err);
+            renderError(err.message);
             statusText.textContent = 'Unable to process request. Please try again.';
             loadingCard.remove();
             setTimeout(() => statusEl.classList.remove('active'), 3000);
@@ -421,6 +423,7 @@ async function handleTask() {
                 body: formData
             });
             const data = await response.json();
+            if (!response.ok || data.error) throw new Error(data.error || 'Research request failed.');
             loadingCard.remove();
             if (!data.error) {
                 updateSessionHistory(task, data);
@@ -428,12 +431,25 @@ async function handleTask() {
             renderCard(data);
         } catch (err) {
             console.error('Agent request failed:', err);
+            renderError(err.message);
             loadingCard.remove();
         }
     }
 }
 
+function renderError(message) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.setAttribute('role', 'alert');
+    card.textContent = message || 'Research could not be completed. Please try again.';
+    document.getElementById('feed').appendChild(card);
+}
+
 function renderCard(data) {
+    if (typeof data.title !== 'string' || !data.title.trim() || typeof data.desc !== 'string' || !data.desc.trim()) {
+        renderError('The research provider returned an incomplete report. Please try again.');
+        return;
+    }
     const feed = document.getElementById('feed');
     const metrics = Array.isArray(data.metrics) ? data.metrics : [];
     const metricsHtml = metrics.map(m => `<span class="metric-badge">${escapeHtml(m)}</span>`).join('');

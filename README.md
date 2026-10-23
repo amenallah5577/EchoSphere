@@ -34,7 +34,7 @@ EchoSphere is an AI research workspace for turning web searches and uploaded PDF
 ```bash
 git clone https://github.com/amenallah5577/EchoSphere.git
 cd EchoSphere
-npm install
+npm ci
 cp .env.example .env
 npm run check
 npm start
@@ -50,6 +50,7 @@ Copy `.env.example` to `.env`, then fill in:
 | --- | --- |
 | `MONGODB_URI` | MongoDB connection string for saved report history. |
 | `GROQ_API_KEY` | Groq API key for report generation. |
+| `GROQ_MODEL` | Available Groq model ID with JSON object mode; explicitly required for research. |
 | `TAVILY_API_KEY` | Tavily API key for live web search. |
 | `SESSION_SECRET` | Long random secret used to sign anonymous browser sessions. |
 | `CLERK_SECRET_KEY` | Optional Clerk backend key. Enable together with `CLERK_PUBLISHABLE_KEY`. |
@@ -69,6 +70,8 @@ Copy `.env.example` to `.env`, then fill in:
 | `/admin.html` | `GET` | Protected admin dashboard for reviewing saved reports. |
 
 ## Quality Checks
+
+See [verified local setup and the retrieval trade-off](docs/engineering.md). Hosted research and history failed the latest workflow check; use the local setup until deployment configuration is repaired.
 
 ```bash
 npm run check

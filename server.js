@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const { clerkMiddleware, getAuth } = require('@clerk/express');
 const multer = require('multer');
-const pdfParse = require('pdf-parse');
+const { extractPdfText } = require('./lib/pdf');
 const rateLimit = require('express-rate-limit');
 const { getOrCreateGuestSession } = require('./lib/session');
 
@@ -89,7 +89,7 @@ app.get('/api/profile', profileMiddleware, (req, res) => {
 app.use(express.static('public'));
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
+if (require.main === module && process.env.MONGODB_URI) mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('✅ Connected to MongoDB!'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
@@ -116,7 +116,7 @@ const dispatchLimiter = rateLimit({
     message: { error: 'Too many research requests. Please try again in a few minutes.' }
 });
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
 
 async function scrapeUrl(url) {
     try {
@@ -175,9 +175,12 @@ async function searchWebForAgent(query) {
             search_depth: "advanced",
             include_answer: true,
             max_results: 3
-        })
+        }),
+        signal: AbortSignal.timeout(15000)
     });
+    if (!response.ok) throw new Error(`Search provider returned HTTP ${response.status}`);
     const data = await response.json();
+    if (!Array.isArray(data.results)) throw new Error('Search provider returned invalid results');
 
     // Deep scrape the top 2 result URLs for richer context
     if (Array.isArray(data.results)) {
@@ -206,6 +209,9 @@ app.post('/api/dispatch', dispatchLimiter, profileMiddleware, upload.single('fil
         if (task.length < 3 || task.length > 1000) {
             return res.status(400).json({ error: 'Research questions must contain between 3 and 1000 characters.' });
         }
+        if (!groq || !process.env.GROQ_MODEL || !process.env.TAVILY_API_KEY) {
+            return res.status(503).json({ error: 'Research is temporarily unavailable. The server needs configured search and model providers.' });
+        }
         // history may arrive as a JSON string (from FormData) or as an array (from JSON body)
         let history = req.body.history;
         if (typeof history === 'string') {
@@ -222,18 +228,19 @@ app.post('/api/dispatch', dispatchLimiter, profileMiddleware, upload.single('fil
         // If a PDF was uploaded, parse it and append the extracted text to the context
         if (req.file && req.file.mimetype === 'application/pdf') {
             try {
-                const pdfData = await pdfParse(req.file.buffer);
-                const pdfText = pdfData.text.slice(0, 5000);
+                const pdfText = await extractPdfText(req.file.buffer);
                 liveContext += `\n\n--- Uploaded PDF: ${req.file.originalname} ---\n${pdfText}`;
             } catch (pdfErr) {
-                console.error('PDF parse error:', pdfErr);
+                return res.status(400).json({ error: 'The PDF could not be read. Upload a valid text-based PDF.' });
             }
         }
 
         // Build the messages array: system prompt + conversation history + current task
         // Cap to last 20 messages (10 pairs) on the server side to prevent token overflow
         const MAX_HISTORY = 20;
-        const conversationHistory = Array.isArray(history) ? history.slice(-MAX_HISTORY) : [];
+        const conversationHistory = Array.isArray(history) ? history
+            .filter(message => message && ['user', 'assistant'].includes(message.role) && typeof message.content === 'string')
+            .slice(-MAX_HISTORY).map(message => ({ role: message.role, content: message.content.slice(0, 4000) })) : [];
 
         const messages = [
             {
@@ -262,13 +269,15 @@ Respond ONLY in valid JSON using this exact schema:
         ];
 
         const completion = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
+            model: process.env.GROQ_MODEL,
             messages,
             temperature: 0.3,
             response_format: { type: "json_object" }
         });
 
         const agentResponse = JSON.parse(completion.choices[0].message.content);
+        if (!agentResponse || typeof agentResponse.title !== 'string' || !agentResponse.title.trim()
+            || typeof agentResponse.desc !== 'string' || !agentResponse.desc.trim()) throw new Error('Model returned an incomplete report');
 
         // Remove the internal scratchpad field — it is for Chain of Thought only and must not be sent to the client
         delete agentResponse.scratchpad;
@@ -295,6 +304,7 @@ Respond ONLY in valid JSON using this exact schema:
 });
 
 app.get('/api/history', historyLimiter, profileMiddleware, async (req, res) => {
+    if (mongoose.connection.readyState !== 1) return res.status(503).json({ error: 'History is temporarily unavailable.' });
     try {
         const history = await History.find({ ownerId: req.profile.ownerId }).sort({ date: -1 }).limit(50);
         res.set('Cache-Control', 'no-store');
@@ -305,6 +315,7 @@ app.get('/api/history', historyLimiter, profileMiddleware, async (req, res) => {
 });
 
 app.get('/api/admin/history', adminLock, async (req, res) => {
+    if (mongoose.connection.readyState !== 1) return res.status(503).json({ error: 'History is temporarily unavailable.' });
     try {
         const history = await History.find({}).sort({ date: -1 }).limit(100);
         res.json(history);
@@ -324,4 +335,5 @@ app.use((error, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 EchoSphere running on port ${PORT}`));
+if (require.main === module) app.listen(PORT, () => console.log(`🚀 EchoSphere running on port ${PORT}`));
+module.exports = app;
