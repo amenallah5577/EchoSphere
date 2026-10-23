@@ -72,10 +72,16 @@ Copy `.env.example` to `.env`, then fill in:
 
 ```bash
 npm run check
+npm test
+npm run eval:check
 npm audit
 ```
 
 `npm run check` validates the server syntax. `npm audit` is useful before releases because upstream provider SDK advisories can change over time.
+
+### Grounded-generation evaluation
+
+The [30-case evaluation suite](eval/README.md) compares two candidate prompts against identical frozen reference sources and records answer-quality proxies, source matches, errors and median/p95 provider latency. It includes unsupported questions, conflicting evidence and source injection cases. **Live results are pending provider credentials; no quality or performance claims are established yet.** Manual claim-level review is required before reporting citation accuracy.
 
 ## Optional Clerk Accounts
 

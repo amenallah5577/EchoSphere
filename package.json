@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "check": "node --check server.js && node --check public/app.js",
-    "test": "node --test"
+    "test": "node --test",
+    "eval:check": "node eval/run.js --dry-run",
+    "eval:run": "node eval/run.js"
   },
   "keywords": [
     "ai-agent",
