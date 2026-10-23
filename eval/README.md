@@ -1,6 +1,6 @@
 # Reproducible generation evaluation
 
-**Status: prepared; live measurements pending a Groq API key.** No answer-quality, citation-accuracy, latency or prompt-winner claims have been established. Passing the unit tests validates the harness, not the model.
+**Status: one local-model run published.** The [23 October 2026 Ollama comparison](results/local-llama32-2026-10-23/findings.md) includes all 60 raw answers, automated scores, an assistant-reviewed claim annotation, and limitations. A Groq/hosted-app evaluation is still pending provider access. Passing unit tests alone does not validate model quality.
 
 ## Scope and dataset
 
@@ -86,7 +86,7 @@ Report normalized quality as `sum(scores) / (2 * attempted requests)`. For citat
 
 The application's one-URL response schema cannot attribute every claim in a multi-source synthesis. Explicitly review ES-17 through ES-20 for this limitation. No automated URL match should be described as measured citation accuracy.
 
-## Publish findings only after a real run
+## Publishing a reviewed run
 
 Include the run date, commit and hashes, exact model/parameters, dataset scope, completed/attempted counts, automated proxies, manually reviewed quality and citation metrics, latency sample sizes, and representative failures from actual responses. Do not convert the synthetic source documents' latency figures into application measurements.
 

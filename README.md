@@ -84,7 +84,7 @@ npm audit
 
 ### Grounded-generation evaluation
 
-The [30-case evaluation suite](eval/README.md) compares two candidate prompts against identical frozen reference sources and records answer-quality proxies, source matches, errors and median/p95 provider latency. It includes unsupported questions, conflicting evidence and source injection cases. **Live results are pending provider credentials; no quality or performance claims are established yet.** Manual claim-level review is required before reporting citation accuracy.
+The [30-case evaluation suite](eval/README.md) compares two candidate prompts against identical frozen reference sources. A [reviewed local Ollama run](eval/results/local-llama32-2026-10-23/findings.md) records answer quality, source support, prompt-injection failures and median/p95 request latency. It does not measure the hosted Groq application.
 
 ## Optional Clerk Accounts
 
